@@ -7,37 +7,36 @@ use Illuminate\Http\Request;
 use App\Http\Requests;
 use App\Http\Controllers\Controller;
 
-use DB;
-
-use Auth;
-
-use App\Models\TypeProduct;
-use App\Models\CategoryProduct;
-use App\Models\Laptop;
-use App\Models\ProductDetail;
-use App\Models\Product;
+use App\Persistences\Laptop\LaptopPersistenceInterface;
+use App\Persistences\Product\ProductPersistenceInterface;
+use App\Persistences\WishListProduct\WishListProductPersistenceInterface;
+use App\Persistences\CategoryProduct\CategoryProductPersistenceInterface;
+use App\Persistences\User\UserPersistenceInterface;
 
 class LaptopController extends Controller
 {
+   public function __construct(LaptopPersistenceInterface $laptop_persistence,
+                               ProductPersistenceInterface $product_persistence,
+                               WishListProductPersistenceInterface $wish_list_product_persistence,
+                               CategoryProductPersistenceInterface $category_product_persistence,
+                               UserPersistenceInterface $user_persistence)
+   {
+      $this->laptop_persistence            = $laptop_persistence;
+      $this->product_persistence           = $product_persistence;
+      $this->wish_list_product_persistence = $wish_list_product_persistence;
+      $this->category_product_persistence  = $category_product_persistence;
+      $this->user_persistence              = $user_persistence;
+   }
+
    public function getAll()
    {
 
-      if(Auth::check()){
-         $wish_list_id = Auth::user()->id;
-      }else{
-         $wish_list_id = null;
-      }
+      $type_product_id = 1;
 
-      $laptops   = Laptop::all();
-      $companies = DB::table('products')->where('type_product_id', '=', '1')
-                                        ->join('companies', 'companies.id', '=', 'products.company_id')
-                                        ->select('companies.name', 'companies.id')
-                                        ->distinct()
-                                        ->get();
-
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                  ->select('product_id')
-                                                  ->get();
+      $user_id    = $this->user_persistence->checkAuthenticacion();
+      $laptops    = $this->laptop_persistence->all();
+      $companies  = $this->product_persistence->getCompaniesByTypeProduct($type_product_id);
+      $wish_lists = $this->wish_list_product_persistence->getWishList($user_id);
 
       $data = [
          'laptops'    => $laptops,
@@ -50,22 +49,12 @@ class LaptopController extends Controller
 
    public function getOffice()
    {
-      if(Auth::check()){
-         $wish_list_id = Auth::user()->id;
-      }else{
-         $wish_list_id = null;
-      }
+      $category_product_id = 1;
 
-      $laptops_office = CategoryProduct::find(1)->products;
-      $companies      = DB::table('products')->where('category_product_id', '=', '1')
-                                             ->join('companies', 'companies.id', '=', 'products.company_id')
-                                             ->select('companies.name', 'companies.id')
-                                             ->distinct()
-                                             ->get();
-
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                   ->select('product_id')
-                                                   ->get();
+      $user_id        = $this->user_persistence->checkAuthenticacion();
+      $laptops_office = $this->category_product_persistence->getLaptopsOffice($category_product_id);
+      $companies      = $this->product_persistence->getCompaniesByCategoryProduct($category_product_id);
+      $wish_lists     = $this->wish_list_product_persistence->getWishList($user_id);
 
       $data = [
          'laptops_office' => $laptops_office,
@@ -78,22 +67,12 @@ class LaptopController extends Controller
 
    public function getUltrabooks()
    {
-      if(Auth::check()){
-         $wish_list_id = Auth::user()->id;
-      }else{
-         $wish_list_id = null;
-      }
+      $category_product_id = 2;
 
-      $laptops_office = CategoryProduct::find(2)->products;
-      $companies = DB::table('products')->where('category_product_id', '=', '2')
-                                        ->join('companies', 'companies.id', '=', 'products.company_id')
-                                        ->select('companies.name', 'companies.id')
-                                        ->distinct()
-                                        ->get();
-
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                   ->select('product_id')
-                                                   ->get();
+      $user_id        = $this->user_persistence->checkAuthenticacion();
+      $laptops_office = $this->category_product_persistence->getLaptopsOffice($category_product_id);
+      $companies      = $this->product_persistence->getCompaniesByCategoryProduct($category_product_id);
+      $wish_lists     = $this->wish_list_product_persistence->getWishList($user_id);
 
       $data = [
          'laptops_office' => $laptops_office,
@@ -106,14 +85,8 @@ class LaptopController extends Controller
 
    public function getProduct($id)
    {
-      if(Auth::check()){
-         $wish_list_id = Auth::user()->id;
-      }else{
-         $wish_list_id = null;
-      }
-
-      $laptop = Laptop::find($id);
-      $related_products = Laptop::all()->random(4);
+      $laptop           = $this->laptop_persistence->find($id);
+      $related_products = $this->laptop_persistence->relatedProducts();
 
       $data = [
          'laptop'           => $laptop,
@@ -137,31 +110,9 @@ class LaptopController extends Controller
          $wish_list_id = null;
       }
 
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                   ->select('product_id')
-                                                   ->get();
 
-      if(empty($companies)){
-
-         $laptops = DB::table('products')->where('type_product_id','=',1)
-                                         ->join('product_details','product_details.id','=','products.id')->get();
-
-      }else{
-
-         $query_list = DB::table('products')->where('company_id','=', 0)
-                                            ->join('product_details','product_details.id','=','products.id');
-
-         foreach ($companies as $company) {
-
-            $subquery = DB::table('products')->where('company_id','=', $company->id)
-                                             ->join('product_details','product_details.id','=','products.id');
-
-            $query_list = $query_list->union($subquery);
-
-         }
-
-         $laptops = $query_list->get();
-      }
+      $wish_lists = $this->wish_list_product_persistence->getWishList($wish_list_id);
+      $laptops    = $this->product_persistence->filterProductByCompany($companies);
 
       $data = [
          'auth'       => $auth,
@@ -186,28 +137,8 @@ class LaptopController extends Controller
          $wish_list_id = null;
       }
 
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                   ->select('product_id')
-                                                   ->get();
-
-      if(empty($companies)){
-
-         $laptops = DB::table('products')->where('category_product_id','=',1)
-                                         ->join('product_details','product_details.id','=','products.id')
-                                         ->get();
-      }else{
-         $query_list = DB::table('products')->where('company_id','=', 0)
-                                            ->join('product_details','product_details.id','=','products.id');
-
-         foreach ($companies as $company) {
-            $subquery = DB::table('products')->where('company_id','=', $company->id)
-                                             ->where('category_product_id','=',1)
-                                             ->join('product_details','product_details.id','=','products.id');
-
-            $query_list = $query_list->union($subquery);
-         }
-         $laptops = $query_list->get();
-      }
+      $wish_lists = $this->wish_list_product_persistence->getWishList($wish_list_id);
+      $laptops    = $this->product_persistence->filterProductByCompany($companies);
 
       $data = [
          'auth'       => $auth,
@@ -232,28 +163,8 @@ class LaptopController extends Controller
          $wish_list_id = null;
       }
 
-      $wish_lists = DB::table('wish_list_products')->where('wish_list_id', '=', $wish_list_id)
-                                                   ->select('product_id')
-                                                   ->get();
-
-      if(empty($companies)){
-
-         $laptops = DB::table('products')->where('category_product_id','=',2)
-                                         ->join('product_details','product_details.id','=','products.id')
-                                         ->get();
-      }else{
-         $query_list = DB::table('products')->where('company_id','=', 0)
-                                            ->join('product_details','product_details.id','=','products.id');
-
-         foreach ($companies as $company) {
-            $subquery = DB::table('products')->where('company_id','=', $company->id)
-                                             ->where('category_product_id','=',2)
-                                             ->join('product_details','product_details.id','=','products.id');
-
-            $query_list = $query_list->union($subquery);
-         }
-         $laptops = $query_list->get();
-      }
+      $wish_lists = $this->wish_list_product_persistence->getWishList($wish_list_id);
+      $laptops    = $this->product_persistence->filterProductByCompany($companies);
 
       $data = [
          'auth'       => $auth,
