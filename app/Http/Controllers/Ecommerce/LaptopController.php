@@ -13,6 +13,8 @@ use App\Persistences\WishListProduct\WishListProductPersistenceInterface;
 use App\Persistences\CategoryProduct\CategoryProductPersistenceInterface;
 use App\Persistences\User\UserPersistenceInterface;
 
+use Auth;
+
 class LaptopController extends Controller
 {
    public function __construct(LaptopPersistenceInterface $laptop_persistence,
